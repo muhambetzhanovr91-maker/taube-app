@@ -1,6 +1,6 @@
 package kz.taube.app
 
-import org.json.JSONArray
+import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -28,21 +28,26 @@ object PrayerApi {
                 .use { it.readText() }
 
             parsePrayerTimes(response)
+
         } finally {
             connection.disconnect()
         }
     }
 
     private fun parsePrayerTimes(json: String): List<DailyPrayerTimes> {
+
         val result = mutableListOf<DailyPrayerTimes>()
-        val array = JSONArray(json)
+
+        val root = JSONObject(json)
+        val array = root.optJSONArray("result") ?: return result
 
         for (i in 0 until array.length()) {
+
             val item = array.getJSONObject(i)
 
             result.add(
                 DailyPrayerTimes(
-                    date = item.optString("date"),
+                    date = item.optString("Date"),
                     fajr = item.optString("fajr"),
                     sunrise = item.optString("sunrise"),
                     dhuhr = item.optString("dhuhr"),
