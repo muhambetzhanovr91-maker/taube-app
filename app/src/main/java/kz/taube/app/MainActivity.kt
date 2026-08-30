@@ -18,6 +18,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,10 +33,10 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
-import java.time.Duration
 
 class MainActivity : ComponentActivity() {
 
@@ -48,7 +49,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@androidx.compose.runtime.Composable
+@Composable
 fun TaubeApp() {
 
     val green = Color(0xFF176B4D)
@@ -69,6 +70,7 @@ fun TaubeApp() {
     LaunchedEffect(Unit) {
 
         try {
+
             val result = withContext(Dispatchers.IO) {
 
                 PrayerApi.getPrayerTimes(
@@ -78,14 +80,19 @@ fun TaubeApp() {
                 )
             }
 
+            if (result.isEmpty()) {
+                throw Exception("API бос жауап қайтарды")
+            }
+
             val today = LocalDate.now().toString()
 
             prayerTimes = result.firstOrNull {
-                it.date.startsWith(today)
-            } ?: result.firstOrNull()
+                it.date == today
+            } ?: result.first()
 
         } catch (e: Exception) {
-            error = "Намаз уақыттарын жүктеу мүмкін болмады"
+
+            error = "Қате: ${e.message ?: "Белгісіз қате"}"
         }
 
         loading = false
@@ -115,122 +122,149 @@ fun TaubeApp() {
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            if (loading) {
+            when {
 
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-
-                    CircularProgressIndicator(color = green)
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Text("Намаз уақыттары жүктелуде...")
-                }
-
-            } else if (error != null) {
-
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp)
-                ) {
-
-                    Text(
-                        text = error ?: "",
-                        modifier = Modifier.padding(20.dp),
-                        color = Color.Red
-                    )
-                }
-
-            } else if (prayerTimes != null) {
-
-                val p = prayerTimes!!
-
-                val prayers = listOf(
-                    "Таң" to p.fajr,
-                    "Күн шығуы" to p.sunrise,
-                    "Бесін" to p.dhuhr,
-                    "Екінті" to p.asr,
-                    "Ақшам" to p.maghrib,
-                    "Құптан" to p.isha
-                )
-
-                val nextPrayer = findNextPrayer(prayers)
-
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = green
-                    )
-                ) {
+                loading -> {
 
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
 
-                        Text(
-                            text = "Жаңаөзен",
-                            color = Color.White,
-                            fontSize = 16.sp
+                        CircularProgressIndicator(
+                            color = green
                         )
 
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        Text(
-                            text = "Келесі намаз",
-                            color = Color.White.copy(alpha = 0.8f)
+                        Spacer(
+                            modifier = Modifier.height(12.dp)
                         )
 
                         Text(
-                            text = nextPrayer.first,
-                            color = Color.White,
-                            fontSize = 30.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        Text(
-                            text = nextPrayer.second,
-                            color = Color.White,
-                            fontSize = 23.sp
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Countdown(
-                            prayerTime = nextPrayer.second
+                            text = "Намаз уақыттары жүктелуде..."
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                error != null -> {
 
-                Text(
-                    text = "Бүгінгі намаз уақыттары",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color(0xFFF1E9EE)
+                        )
+                    ) {
 
-                Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = error ?: "",
+                            modifier = Modifier.padding(20.dp),
+                            color = Color.Red,
+                            fontSize = 16.sp
+                        )
+                    }
+                }
 
-                prayers.forEach { prayer ->
+                prayerTimes != null -> {
 
-                    PrayerRow(
-                        name = prayer.first,
-                        time = prayer.second
+                    val p = prayerTimes!!
+
+                    val prayers = listOf(
+                        "Таң" to p.fajr,
+                        "Күн шығуы" to p.sunrise,
+                        "Бесін" to p.dhuhr,
+                        "Екінті" to p.asr,
+                        "Ақшам" to p.maghrib,
+                        "Құптан" to p.isha
                     )
+
+                    val nextPrayer = findNextPrayer(prayers)
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = green
+                        )
+                    ) {
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+
+                            Text(
+                                text = "Жаңаөзен",
+                                color = Color.White,
+                                fontSize = 16.sp
+                            )
+
+                            Spacer(
+                                modifier = Modifier.height(10.dp)
+                            )
+
+                            Text(
+                                text = "Келесі намаз",
+                                color = Color.White.copy(
+                                    alpha = 0.8f
+                                )
+                            )
+
+                            Text(
+                                text = nextPrayer.first,
+                                color = Color.White,
+                                fontSize = 30.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            Text(
+                                text = nextPrayer.second,
+                                color = Color.White,
+                                fontSize = 23.sp
+                            )
+
+                            Spacer(
+                                modifier = Modifier.height(8.dp)
+                            )
+
+                            Countdown(
+                                prayerTime = nextPrayer.second
+                            )
+                        }
+                    }
+
+                    Spacer(
+                        modifier = Modifier.height(20.dp)
+                    )
+
+                    Text(
+                        text = "Бүгінгі намаз уақыттары",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(
+                        modifier = Modifier.height(10.dp)
+                    )
+
+                    prayers.forEach { prayer ->
+
+                        PrayerRow(
+                            name = prayer.first,
+                            time = prayer.second
+                        )
+                    }
                 }
             }
         }
     }
 }
 
-@androidx.compose.runtime.Composable
-fun Countdown(prayerTime: String) {
+@Composable
+fun Countdown(
+    prayerTime: String
+) {
 
     var remaining by remember {
         mutableStateOf("")
@@ -240,33 +274,42 @@ fun Countdown(prayerTime: String) {
 
         while (true) {
 
-            val now = LocalDateTime.now()
-            val targetTime = LocalTime.parse(prayerTime)
+            try {
 
-            var target = LocalDateTime.of(
-                LocalDate.now(),
-                targetTime
-            )
+                val now = LocalDateTime.now()
 
-            if (!target.isAfter(now)) {
-                target = target.plusDays(1)
+                val targetTime =
+                    LocalTime.parse(prayerTime)
+
+                var target = LocalDateTime.of(
+                    LocalDate.now(),
+                    targetTime
+                )
+
+                if (!target.isAfter(now)) {
+                    target = target.plusDays(1)
+                }
+
+                val seconds = Duration.between(
+                    now,
+                    target
+                ).seconds
+
+                val hours = seconds / 3600
+                val minutes = (seconds % 3600) / 60
+                val secs = seconds % 60
+
+                remaining = String.format(
+                    "%02d:%02d:%02d",
+                    hours,
+                    minutes,
+                    secs
+                )
+
+            } catch (e: Exception) {
+
+                remaining = "--:--:--"
             }
-
-            val seconds = Duration.between(
-                now,
-                target
-            ).seconds
-
-            val hours = seconds / 3600
-            val minutes = (seconds % 3600) / 60
-            val secs = seconds % 60
-
-            remaining = String.format(
-                "%02d:%02d:%02d",
-                hours,
-                minutes,
-                secs
-            )
 
             delay(1000)
         }
@@ -288,7 +331,8 @@ fun findNextPrayer(
     return prayers.firstOrNull { prayer ->
 
         try {
-            LocalTime.parse(prayer.second).isAfter(now)
+            LocalTime.parse(prayer.second)
+                .isAfter(now)
         } catch (e: Exception) {
             false
         }
@@ -296,7 +340,7 @@ fun findNextPrayer(
     } ?: prayers.first()
 }
 
-@androidx.compose.runtime.Composable
+@Composable
 fun PrayerRow(
     name: String,
     time: String
@@ -319,7 +363,8 @@ fun PrayerRow(
                     horizontal = 18.dp,
                     vertical = 14.dp
                 ),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement =
+                Arrangement.SpaceBetween
         ) {
 
             Text(
