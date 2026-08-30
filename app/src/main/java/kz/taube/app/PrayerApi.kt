@@ -1,14 +1,10 @@
 package kz.taube.app
 
 import org.json.JSONObject
-import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
 object PrayerApi {
-
-    private const val API_BASE =
-        "https://api.muftyat.kz/prayer-times"
 
     fun getPrayerTimes(
         year: Int,
@@ -16,42 +12,28 @@ object PrayerApi {
         longitude: Double
     ): List<DailyPrayerTimes> {
 
-        val url = URL(
-            "$API_BASE/$year/$latitude/$longitude"
-        )
+        val address =
+            "https://api.muftyat.kz/prayer-times/$year/$latitude/$longitude"
 
-        val connection = url.openConnection() as HttpURLConnection
+        val connection = URL(address).openConnection() as HttpURLConnection
 
-        return try {
+        try {
             connection.requestMethod = "GET"
-            connection.connectTimeout = 8000
-            connection.readTimeout = 8000
-            connection.useCaches = false
-            connection.doInput = true
+            connection.connectTimeout = 15000
+            connection.readTimeout = 15000
+            connection.setRequestProperty("Accept", "application/json")
 
-            connection.setRequestProperty(
-                "Accept",
-                "application/json"
-            )
+            val code = connection.responseCode
 
-            connection.setRequestProperty(
-                "User-Agent",
-                "TAUBE Android App"
-            )
-
-            val responseCode = connection.responseCode
-
-            if (responseCode !in 200..299) {
-                throw IOException(
-                    "ҚМДБ API HTTP қате: $responseCode"
-                )
+            if (code !in 200..299) {
+                throw Exception("API қатесі: HTTP $code")
             }
 
             val response = connection.inputStream
                 .bufferedReader()
                 .use { it.readText() }
 
-            parsePrayerTimes(response)
+            return parsePrayerTimes(response)
 
         } finally {
             connection.disconnect()
@@ -67,75 +49,22 @@ object PrayerApi {
         val root = JSONObject(json)
 
         val array = root.optJSONArray("result")
-            ?: throw IOException(
-                "API ішінде result массиві табылмады"
-            )
+            ?: throw Exception("API result табылмады")
 
         for (i in 0 until array.length()) {
 
             val item = array.getJSONObject(i)
 
-            val date = item.optString(
-                "Date",
-                ""
-            ).trim()
-
-            val fajr = item.optString(
-                "fajr",
-                ""
-            ).trim()
-
-            val sunrise = item.optString(
-                "sunrise",
-                ""
-            ).trim()
-
-            val dhuhr = item.optString(
-                "dhuhr",
-                ""
-            ).trim()
-
-            val asr = item.optString(
-                "asr",
-                ""
-            ).trim()
-
-            val maghrib = item.optString(
-                "maghrib",
-                ""
-            ).trim()
-
-            val isha = item.optString(
-                "isha",
-                ""
-            ).trim()
-
-            if (
-                date.isNotEmpty() &&
-                fajr.isNotEmpty() &&
-                sunrise.isNotEmpty() &&
-                dhuhr.isNotEmpty() &&
-                asr.isNotEmpty() &&
-                maghrib.isNotEmpty() &&
-                isha.isNotEmpty()
-            ) {
-                result.add(
-                    DailyPrayerTimes(
-                        date = date,
-                        fajr = fajr,
-                        sunrise = sunrise,
-                        dhuhr = dhuhr,
-                        asr = asr,
-                        maghrib = maghrib,
-                        isha = isha
-                    )
+            result.add(
+                DailyPrayerTimes(
+                    date = item.optString("Date"),
+                    fajr = item.optString("fajr"),
+                    sunrise = item.optString("sunrise"),
+                    dhuhr = item.optString("dhuhr"),
+                    asr = item.optString("asr"),
+                    maghrib = item.optString("maghrib"),
+                    isha = item.optString("isha")
                 )
-            }
-        }
-
-        if (result.isEmpty()) {
-            throw IOException(
-                "ҚМДБ API бос дерек қайтарды"
             )
         }
 
