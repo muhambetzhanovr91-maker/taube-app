@@ -20,7 +20,8 @@ import androidx.compose.ui.unit.sp
 import com.google.android.gms.location.LocationServices
 import java.util.Locale
 
-data class PrayerItemData(
+// Егер бұл класс басқа файлда бар болса, қате бермес үшін оны HomeScreenData деп өзгерттік
+data class HomeScreenPrayerItem(
     val icon: String,
     val name: String,
     val time: String,
@@ -142,12 +143,12 @@ fun HomeScreen() {
         Spacer(modifier = Modifier.height(12.dp))
 
         val prayerList = listOf(
-            PrayerItemData("🌅", "Таң (Субх)", "03:50", false),
-            PrayerItemData("☀️", "Күн шығуы", "05:28", false),
-            PrayerItemData("🕌", "Бесін", "13:05", true),
-            PrayerItemData("🌆", "Екінті", "17:17", false),
-            PrayerItemData("🌇", "Ақшам", "20:30", false),
-            PrayerItemData("🌙", "Құптан (Иша)", "22:05", false)
+            HomeScreenPrayerItem("🌅", "Таң (Субх)", "03:50", false),
+            HomeScreenPrayerItem("☀️", "Күн шығуы", "05:28", false),
+            HomeScreenPrayerItem("🕌", "Бесін", "13:05", true),
+            HomeScreenPrayerItem("🌆", "Екінті", "17:17", false),
+            HomeScreenPrayerItem("🌇", "Ақшам", "20:30", false),
+            HomeScreenPrayerItem("🌙", "Құптан (Иша)", "22:05", false)
         )
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -160,7 +161,7 @@ fun HomeScreen() {
     }
 }
 
-fun getUserLocation(context: Context, onLocationReceived: (Location?) -> Unit) {
+private fun getUserLocation(context: Context, onLocationReceived: (Location?) -> Unit) {
     try {
         val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
         fusedLocationClient.lastLocation.addOnSuccessListener { location ->
@@ -173,7 +174,7 @@ fun getUserLocation(context: Context, onLocationReceived: (Location?) -> Unit) {
     }
 }
 
-fun getCityNameFromCoords(context: Context, lat: Double, lon: Double): String {
+private fun getCityNameFromCoords(context: Context, lat: Double, lon: Double): String {
     return try {
         val geocoder = Geocoder(context, Locale("kk"))
         @Suppress("DEPRECATION")
@@ -189,7 +190,7 @@ fun getCityNameFromCoords(context: Context, lat: Double, lon: Double): String {
 }
 
 @Composable
-fun PrayerRowItem(data: PrayerItemData) {
+private fun PrayerRowItem(data: HomeScreenPrayerItem) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
