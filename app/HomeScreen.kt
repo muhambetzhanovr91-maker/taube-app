@@ -20,25 +20,26 @@ import androidx.compose.ui.unit.sp
 import com.google.android.gms.location.LocationServices
 import java.util.Locale
 
+data class PrayerItemData(
+    val icon: String,
+    val name: String,
+    val time: String,
+    val isActive: Boolean
+)
+
 @Composable
 fun HomeScreen() {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
 
-    // Автоматты анықталатын қала аты (әдепкі бойынша жүктелуде...)
     var cityName by remember { mutableStateOf("Анықталуда...") }
-    var latitude by remember { mutableDoubleStateOf(43.34) } // Әдепкі координата
-    var longitude by remember { mutableDoubleStateOf(52.85) }
 
-    // Тұрған жерді (GPS) автоматты түрде анықтау
     LaunchedEffect(Unit) {
         getUserLocation(context) { loc ->
             if (loc != null) {
-                latitude = loc.latitude
-                longitude = loc.longitude
                 cityName = getCityNameFromCoords(context, loc.latitude, loc.longitude)
             } else {
-                cityName = "Атырау" // Анықталмаса әдепкі қала
+                cityName = "Атырау"
             }
         }
     }
@@ -52,7 +53,6 @@ fun HomeScreen() {
     ) {
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 1. Жоғарғы шапка (Автоматты анықталған Қала, Қоңырау, Дата)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -77,14 +77,13 @@ fun HomeScreen() {
                 )
             }
 
-            IconButton(onClick = { /* Notification action */ }) {
+            IconButton(onClick = { }) {
                 Text(text = "🔔", fontSize = 20.sp)
             }
         }
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 2. Үлкен жасыл Басты карточка (Hero Card)
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -133,7 +132,6 @@ fun HomeScreen() {
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // 3. Бүгінгі намаз уақыттарының тізімі
         Text(
             text = "Бүгінгі намаз уақыттары",
             fontSize = 16.sp,
@@ -162,7 +160,6 @@ fun HomeScreen() {
     }
 }
 
-// GPS орналасқан жерді анықтау функциясы
 fun getUserLocation(context: Context, onLocationReceived: (Location?) -> Unit) {
     try {
         val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
@@ -176,13 +173,13 @@ fun getUserLocation(context: Context, onLocationReceived: (Location?) -> Unit) {
     }
 }
 
-// Координатадан қаланың атын анықтау
 fun getCityNameFromCoords(context: Context, lat: Double, lon: Double): String {
     return try {
         val geocoder = Geocoder(context, Locale("kk"))
+        @Suppress("DEPRECATION")
         val addresses = geocoder.getFromLocation(lat, lon, 1)
         if (!addresses.isNullOrEmpty()) {
-            addresses[0].locality ?: addresses[0].subAdminArea ?: "Белгісіз қала"
+            addresses[0].locality ?: addresses[0].subAdminArea ?: "Атырау"
         } else {
             "Атырау"
         }
@@ -190,13 +187,6 @@ fun getCityNameFromCoords(context: Context, lat: Double, lon: Double): String {
         "Атырау"
     }
 }
-
-data class PrayerItemData(
-    val icon: String,
-    val name: String,
-    val time: String,
-    val isActive: Boolean
-)
 
 @Composable
 fun PrayerRowItem(data: PrayerItemData) {
