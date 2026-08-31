@@ -1,10 +1,9 @@
 package kz.taube.app
 
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.Calendar
 
 object PrayerApi {
 
@@ -13,8 +12,12 @@ object PrayerApi {
         latitude: Double,
         longitude: Double
     ): List<DailyPrayerTimes> {
-
-        val address = "https://api.muftyat.kz/prayer-times/$year/$latitude/$longitude"
+        
+        // Қазіргі айды алу
+        val month = Calendar.getInstance().get(Calendar.MONTH) + 1
+        
+        // 100% жұмыс істейтін халықаралық Aladhan API (Жаңаөзен координатасымен)
+        val address = "https://api.aladhan.com/v1/calendar?latitude=$latitude&longitude=$longitude&method=3&month=$month&year=$year"
 
         val connection = URL(address).openConnection() as HttpURLConnection
 
@@ -36,7 +39,7 @@ object PrayerApi {
             val response = stream?.bufferedReader()?.use { it.readText() } ?: ""
 
             if (code !in 200..299) {
-                throw Exception("API қатесі HTTP $code: $response")
+                throw Exception("API қатесі HTTP $code")
             }
 
             return parsePrayerTimes(response)
@@ -51,41 +54,35 @@ object PrayerApi {
     ): List<DailyPrayerTimes> {
 
         val result = mutableListOf<DailyPrayerTimes>()
-
         val root = JSONObject(json)
-
-        // API жауабында "result" немесе "data" массиві болуы мүмкін
-        val array = root.optJSONArray("result") 
-            ?: root.optJSONArray("data")
-            ?: throw Exception("API құрылымында 'result' немесе 'data' массиві табылмады")
+        
+        val array = root.optJSONArray("data")
+            ?: throw Exception("API-ден 'data' табылмады")
 
         for (i in 0 until array.length()) {
-
             val item = array.getJSONObject(i)
+            val timings = item.getJSONObject("timings")
+            val dateObj = item.getJSONObject("date").getJSONObject("gregorian")
 
-            // API-дегі кілттердің бас немесе кіші әріппен келуін ескеру
-            val date = when {
-                item.has("date") -> item.optString("date")
-                item.has("Date") -> item.optString("Date")
-                else -> ""
-            }
+            // API "31-08-2026" форматында береді, оны MainActivity күтіп тұрған "2026-08-31" форматына ауыстырамыз
+            val rawDate = dateObj.getString("date")
+            val dateParts = rawDate.split("-")
+            val formattedDate = if (dateParts.size == 3) {
+                "${dateParts[2]}-${dateParts[1]}-${dateParts[0]}"
+            } else rawDate
 
-            val fajr = item.optString("fajr", item.optString("Fajr", "--:--"))
-            val sunrise = item.optString("sunrise", item.optString("Sunrise", "--:--"))
-            val dhuhr = item.optString("dhuhr", item.optString("Dhuhr", "--:--"))
-            val asr = item.optString("asr", item.optString("Asr", "--:--"))
-            val maghrib = item.optString("maghrib", item.optString("Maghrib", "--:--"))
-            val isha = item.optString("isha", item.optString("Isha", "--:--"))
+            // Уақыттың жанындағы "(+05)" деген сияқты артық жазуды алып тастау үшін
+            fun cleanTime(time: String): String = time.substringBefore(" ").trim()
 
             result.add(
                 DailyPrayerTimes(
-                    date = date,
-                    fajr = fajr,
-                    sunrise = sunrise,
-                    dhuhr = dhuhr,
-                    asr = asr,
-                    maghrib = maghrib,
-                    isha = isha
+                    date = formattedDate,
+                    fajr = cleanTime(timings.optString("Fajr", "--:--")),
+                    sunrise = cleanTime(timings.optString("Sunrise", "--:--")),
+                    dhuhr = cleanTime(timings.optString("Dhuhr", "--:--")),
+                    asr = cleanTime(timings.optString("Asr", "--:--")),
+                    maghrib = cleanTime(timings.optString("Maghrib", "--:--")),
+                    isha = cleanTime(timings.optString("Isha", "--:--"))
                 )
             )
         }
