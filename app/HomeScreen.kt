@@ -20,8 +20,7 @@ import androidx.compose.ui.unit.sp
 import com.google.android.gms.location.LocationServices
 import java.util.Locale
 
-// Егер бұл класс басқа файлда бар болса, қате бермес үшін оны HomeScreenData деп өзгерттік
-data class HomeScreenPrayerItem(
+data class HomePrayerItem(
     val icon: String,
     val name: String,
     val time: String,
@@ -143,17 +142,17 @@ fun HomeScreen() {
         Spacer(modifier = Modifier.height(12.dp))
 
         val prayerList = listOf(
-            HomeScreenPrayerItem("🌅", "Таң (Субх)", "03:50", false),
-            HomeScreenPrayerItem("☀️", "Күн шығуы", "05:28", false),
-            HomeScreenPrayerItem("🕌", "Бесін", "13:05", true),
-            HomeScreenPrayerItem("🌆", "Екінті", "17:17", false),
-            HomeScreenPrayerItem("🌇", "Ақшам", "20:30", false),
-            HomeScreenPrayerItem("🌙", "Құптан (Иша)", "22:05", false)
+            HomePrayerItem("🌅", "Таң (Субх)", "03:50", false),
+            HomePrayerItem("☀️", "Күн шығуы", "05:28", false),
+            HomePrayerItem("🕌", "Бесін", "13:05", true),
+            HomePrayerItem("🌆", "Екінті", "17:17", false),
+            HomePrayerItem("🌇", "Ақшам", "20:30", false),
+            HomePrayerItem("🌙", "Құптан (Иша)", "22:05", false)
         )
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             prayerList.forEach { item ->
-                PrayerRowItem(item)
+                PrayerRowCard(item)
             }
         }
 
@@ -169,7 +168,7 @@ private fun getUserLocation(context: Context, onLocationReceived: (Location?) ->
         }.addOnFailureListener {
             onLocationReceived(null)
         }
-    } catch (e: SecurityException) {
+    } catch (e: Exception) {
         onLocationReceived(null)
     }
 }
@@ -190,7 +189,7 @@ private fun getCityNameFromCoords(context: Context, lat: Double, lon: Double): S
 }
 
 @Composable
-private fun PrayerRowItem(data: HomeScreenPrayerItem) {
+private fun PrayerRowCard(data: HomePrayerItem) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
