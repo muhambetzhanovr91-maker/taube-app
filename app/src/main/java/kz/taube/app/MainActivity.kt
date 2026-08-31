@@ -33,16 +33,14 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import java.time.Duration
-import java.time.LocalDate
-import java.time.LocalDateTime
-import java.time.LocalTime
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         setContent {
             TaubeApp()
         }
@@ -51,30 +49,21 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun TaubeApp() {
-
     val green = Color(0xFF176B4D)
     val background = Color(0xFFF7F8F5)
 
-    var prayerTimes by remember {
-        mutableStateOf<DailyPrayerTimes?>(null)
-    }
-
-    var loading by remember {
-        mutableStateOf(true)
-    }
-
-    var error by remember {
-        mutableStateOf<String?>(null)
-    }
+    var prayerTimes by remember { mutableStateOf<DailyPrayerTimes?>(null) }
+    var loading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
-
         try {
+            val calendar = Calendar.getInstance()
+            val currentYear = calendar.get(Calendar.YEAR)
 
             val result = withContext(Dispatchers.IO) {
-
                 PrayerApi.getPrayerTimes(
-                    year = LocalDate.now().year,
+                    year = currentYear,
                     latitude = 43.4861,
                     longitude = 52.9974
                 )
@@ -84,29 +73,24 @@ fun TaubeApp() {
                 throw Exception("API бос жауап қайтарды")
             }
 
-            val today = LocalDate.now().toString()
+            val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            val today = dateFormat.format(Date())
 
-            prayerTimes = result.firstOrNull {
-                it.date == today
-            } ?: result.first()
+            prayerTimes = result.firstOrNull { it.date == today } ?: result.first()
 
         } catch (e: Exception) {
-
             error = "Қате: ${e.message ?: "Белгісіз қате"}"
         }
-
         loading = false
     }
 
     MaterialTheme {
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .background(background)
                 .padding(20.dp)
         ) {
-
             Text(
                 text = "TAUBE",
                 fontSize = 30.sp,
@@ -123,38 +107,23 @@ fun TaubeApp() {
             Spacer(modifier = Modifier.height(24.dp))
 
             when {
-
                 loading -> {
-
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-
-                        CircularProgressIndicator(
-                            color = green
-                        )
-
-                        Spacer(
-                            modifier = Modifier.height(12.dp)
-                        )
-
-                        Text(
-                            text = "Намаз уақыттары жүктелуде..."
-                        )
+                        CircularProgressIndicator(color = green)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(text = "Намаз уақыттары жүктелуде...")
                     }
                 }
 
                 error != null -> {
-
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFFF1E9EE)
-                        )
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFF1E9EE))
                     ) {
-
                         Text(
                             text = error ?: "",
                             modifier = Modifier.padding(20.dp),
@@ -165,9 +134,7 @@ fun TaubeApp() {
                 }
 
                 prayerTimes != null -> {
-
                     val p = prayerTimes!!
-
                     val prayers = listOf(
                         "Таң" to p.fajr,
                         "Күн шығуы" to p.sunrise,
@@ -182,33 +149,25 @@ fun TaubeApp() {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = green
-                        )
+                        colors = CardDefaults.cardColors(containerColor = green)
                     ) {
-
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(24.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-
                             Text(
                                 text = "Жаңаөзен",
                                 color = Color.White,
                                 fontSize = 16.sp
                             )
 
-                            Spacer(
-                                modifier = Modifier.height(10.dp)
-                            )
+                            Spacer(modifier = Modifier.height(10.dp))
 
                             Text(
                                 text = "Келесі намаз",
-                                color = Color.White.copy(
-                                    alpha = 0.8f
-                                )
+                                color = Color.White.copy(alpha = 0.8f)
                             )
 
                             Text(
@@ -224,19 +183,13 @@ fun TaubeApp() {
                                 fontSize = 23.sp
                             )
 
-                            Spacer(
-                                modifier = Modifier.height(8.dp)
-                            )
+                            Spacer(modifier = Modifier.height(8.dp))
 
-                            Countdown(
-                                prayerTime = nextPrayer.second
-                            )
+                            Countdown(prayerTime = nextPrayer.second)
                         }
                     }
 
-                    Spacer(
-                        modifier = Modifier.height(20.dp)
-                    )
+                    Spacer(modifier = Modifier.height(20.dp))
 
                     Text(
                         text = "Бүгінгі намаз уақыттары",
@@ -244,12 +197,9 @@ fun TaubeApp() {
                         fontWeight = FontWeight.Bold
                     )
 
-                    Spacer(
-                        modifier = Modifier.height(10.dp)
-                    )
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     prayers.forEach { prayer ->
-
                         PrayerRow(
                             name = prayer.first,
                             time = prayer.second
@@ -262,55 +212,41 @@ fun TaubeApp() {
 }
 
 @Composable
-fun Countdown(
-    prayerTime: String
-) {
-
-    var remaining by remember {
-        mutableStateOf("")
-    }
+fun Countdown(prayerTime: String) {
+    var remaining by remember { mutableStateOf("") }
 
     LaunchedEffect(prayerTime) {
-
+        val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
         while (true) {
-
             try {
+                val now = Calendar.getInstance()
+                val parsedDate = sdf.parse(prayerTime)
 
-                val now = LocalDateTime.now()
+                if (parsedDate != null) {
+                    val target = Calendar.getInstance().apply {
+                        val pCal = Calendar.getInstance().apply { time = parsedDate }
+                        set(Calendar.HOUR_OF_DAY, pCal.get(Calendar.HOUR_OF_DAY))
+                        set(Calendar.MINUTE, pCal.get(Calendar.MINUTE))
+                        set(Calendar.SECOND, 0)
+                        set(Calendar.MILLISECOND, 0)
+                    }
 
-                val targetTime =
-                    LocalTime.parse(prayerTime)
+                    if (!target.after(now)) {
+                        target.add(Calendar.DAY_OF_YEAR, 1)
+                    }
 
-                var target = LocalDateTime.of(
-                    LocalDate.now(),
-                    targetTime
-                )
+                    val diffMillis = target.timeInMillis - now.timeInMillis
+                    val seconds = diffMillis / 1000
 
-                if (!target.isAfter(now)) {
-                    target = target.plusDays(1)
+                    val hours = seconds / 3600
+                    val minutes = (seconds % 3600) / 60
+                    val secs = seconds % 60
+
+                    remaining = String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, secs)
                 }
-
-                val seconds = Duration.between(
-                    now,
-                    target
-                ).seconds
-
-                val hours = seconds / 3600
-                val minutes = (seconds % 3600) / 60
-                val secs = seconds % 60
-
-                remaining = String.format(
-                    "%02d:%02d:%02d",
-                    hours,
-                    minutes,
-                    secs
-                )
-
             } catch (e: Exception) {
-
                 remaining = "--:--:--"
             }
-
             delay(1000)
         }
     }
@@ -322,56 +258,41 @@ fun Countdown(
     )
 }
 
-fun findNextPrayer(
-    prayers: List<Pair<String, String>>
-): Pair<String, String> {
-
-    val now = LocalTime.now()
+fun findNextPrayer(prayers: List<Pair<String, String>>): Pair<String, String> {
+    val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
+    val now = Calendar.getInstance()
+    val currentMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
 
     return prayers.firstOrNull { prayer ->
-
         try {
-            LocalTime.parse(prayer.second)
-                .isAfter(now)
+            val date = sdf.parse(prayer.second)
+            if (date != null) {
+                val pCal = Calendar.getInstance().apply { time = date }
+                val prayerMinutes = pCal.get(Calendar.HOUR_OF_DAY) * 60 + pCal.get(Calendar.MINUTE)
+                prayerMinutes > currentMinutes
+            } else false
         } catch (e: Exception) {
             false
         }
-
     } ?: prayers.first()
 }
 
 @Composable
-fun PrayerRow(
-    name: String,
-    time: String
-) {
-
+fun PrayerRow(name: String, time: String) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White
-        )
+        colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
-
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(
-                    horizontal = 18.dp,
-                    vertical = 14.dp
-                ),
-            horizontalArrangement =
-                Arrangement.SpaceBetween
+                .padding(horizontal = 18.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-
-            Text(
-                text = name,
-                fontSize = 16.sp
-            )
-
+            Text(text = name, fontSize = 16.sp)
             Text(
                 text = time,
                 fontSize = 16.sp,
