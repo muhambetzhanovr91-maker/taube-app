@@ -4,10 +4,14 @@ import android.content.Context
 import android.location.Geocoder
 import android.location.Location
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -28,13 +32,47 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    HomeScreen()
-                }
+                MainAppStructure()
             }
         }
     }
 }
+
+@Composable
+fun MainAppStructure() {
+    var selectedTab by remember { mutableIntStateOf(0) }
+
+    Scaffold(
+        bottomBar = {
+            NavigationBar(
+                containerColor = Color.White,
+                tonalElevation = 8.dp
+            ) {
+                NavigationBarItem(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    icon = { Text("🕌", fontSize = 20.sp) },
+                    label = { Text("Намаз", fontSize = 12.sp) }
+                )
+                NavigationBarItem(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    icon = { Text("📖", fontSize = 20.sp) },
+                    label = { Text("Құран мен Зікір", fontSize = 12.sp) }
+                )
+            }
+        }
+    ) { innerPadding ->
+        Box(modifier = Modifier.padding(innerPadding)) {
+            when (selectedTab) {
+                0 -> HomeScreen()
+                1 -> QuranDuaScreen()
+            }
+        }
+    }
+}
+
+// ---------------- НАМАЗ КЕСТЕСІ ЭКРАНЫ ----------------
 
 data class HomePrayerItem(
     val icon: String,
@@ -47,7 +85,6 @@ data class HomePrayerItem(
 fun HomeScreen() {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
-
     var cityName by remember { mutableStateOf("Анықталуда...") }
 
     LaunchedEffect(Unit) {
@@ -74,7 +111,11 @@ fun HomeScreen() {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Column(
+                modifier = Modifier.clickable {
+                    Toast.makeText(context, "Орналасқан жер: $cityName", Toast.LENGTH_SHORT).show()
+                }
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = cityName,
@@ -93,7 +134,9 @@ fun HomeScreen() {
                 )
             }
 
-            IconButton(onClick = { }) {
+            IconButton(onClick = {
+                Toast.makeText(context, "Хабарландырулар қосылды", Toast.LENGTH_SHORT).show()
+            }) {
                 Text(text = "🔔", fontSize = 20.sp)
             }
         }
@@ -103,7 +146,10 @@ fun HomeScreen() {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(190.dp),
+                .height(190.dp)
+                .clickable {
+                    Toast.makeText(context, "Келесі намаз: Бесін (13:05)", Toast.LENGTH_SHORT).show()
+                },
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = Color(0xFF0D5C3A))
         ) {
@@ -168,13 +214,142 @@ fun HomeScreen() {
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             prayerList.forEach { item ->
-                PrayerRowCard(item)
+                PrayerRowCard(data = item, onClick = {
+                    Toast.makeText(context, "${item.name} уақыты: ${item.time}", Toast.LENGTH_SHORT).show()
+                })
             }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
     }
 }
+
+// ---------------- ҚҰРАН ЖӘНЕ ЗІКІРЛЕР ЭКРАНЫ ----------------
+
+data class DuaModel(
+    val title: String,
+    val category: String,
+    val arabicText: String,
+    val translation: String
+)
+
+@Composable
+fun QuranDuaScreen() {
+    val context = LocalContext.current
+
+    val duaList = listOf(
+        DuaModel(
+            title = "Фатиха сүресі",
+            category = "Құран сүрелері",
+            arabicText = "Бисмилләһир-рахмаанир-рахим. Әлхамду лилләһи раббил-ғаләмин...",
+            translation = "Аса қамқор, ерекше мейірімді Алланың атымен бастаймын. Барлық мақтау-мадақ әлемдердің Раббысы Аллаға тән..."
+        ),
+        DuaModel(
+            title = "Аятүл-Күрси",
+            category = "Құран аяттары",
+            arabicText = "Аллаһу лә иләһә иллә һуәл-Хаййул-Қаййум...",
+            translation = "Алла — Одан басқа ешбір құдай жоқ. Ол Тірі, Әрі Әрқашан Бар Болушы..."
+        ),
+        DuaModel(
+            title = "Таңғы зікір",
+            category = "Күнделікті зікірлер",
+            arabicText = "Субханаллаһи уә бихамдиһи",
+            translation = "Алла Пәк әрі барлық мақтау Оған тән (Күніне 100 рет)"
+        ),
+        DuaModel(
+            title = "Ықылас сүресі",
+            category = "Құран сүрелері",
+            arabicText = "Құл һуаллаһу ахад. Аллаһус-самад...",
+            translation = "Айт: Ол Алла — Біреу. Алла — Самәд (ешкімге мұқтаж емес)..."
+        ),
+        DuaModel(
+            title = "Іс бастардағы дуа",
+            category = "Күнделікті дуалар",
+            arabicText = "Рабби йассир уә лә туғассир, Рабби тәммим бил-хайр",
+            translation = "Раббым! Жеңілдет, ауырлаптама. Раббым, ісімді қайырлы аяқтауды нәсіп ет."
+        )
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFF8FAFC))
+            .padding(horizontal = 20.dp)
+    ) {
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        Text(
+            text = "Құран мен Зікірлер",
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF0F172A)
+        )
+        Text(
+            text = "Күнделікті дуалар, зікірлер мен сүрелер",
+            fontSize = 13.sp,
+            color = Color(0xFF64748B)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        LazyColumn(
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(bottom = 20.dp)
+        ) {
+            items(duaList) { item ->
+                DuaCard(item = item, onClick = {
+                    Toast.makeText(context, item.title, Toast.LENGTH_SHORT).show()
+                })
+            }
+        }
+    }
+}
+
+@Composable
+fun DuaCard(item: DuaModel, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = item.category.uppercase(),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF0D5C3A),
+                letterSpacing = 1.sp
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = item.title,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF0F172A)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = item.arabicText,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF334155)
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = item.translation,
+                fontSize = 12.sp,
+                color = Color(0xFF64748B)
+            )
+        }
+    }
+}
+
+// ---------------- КӨМЕКШІ ФУНКЦИЯЛАР ----------------
 
 private fun getUserLocation(context: Context, onLocationReceived: (Location?) -> Unit) {
     try {
@@ -205,9 +380,11 @@ private fun getCityNameFromCoords(context: Context, lat: Double, lon: Double): S
 }
 
 @Composable
-private fun PrayerRowCard(data: HomePrayerItem) {
+private fun PrayerRowCard(data: HomePrayerItem, onClick: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (data.isActive) Color(0xFFE6F4ED) else Color.White
