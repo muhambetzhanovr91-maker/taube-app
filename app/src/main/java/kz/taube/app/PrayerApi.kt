@@ -1,6 +1,8 @@
 package kz.taube.app
 
 import org.json.JSONObject
+import java.io.BufferedReader
+import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -12,8 +14,7 @@ object PrayerApi {
         longitude: Double
     ): List<DailyPrayerTimes> {
 
-        val address =
-            "https://api.muftyat.kz/prayer-times/$year/$latitude/$longitude"
+        val address = "https://api.muftyat.kz/prayer-times/$year/$latitude/$longitude"
 
         val connection = URL(address).openConnection() as HttpURLConnection
 
@@ -22,16 +23,21 @@ object PrayerApi {
             connection.connectTimeout = 15000
             connection.readTimeout = 15000
             connection.setRequestProperty("Accept", "application/json")
+            connection.setRequestProperty("User-Agent", "Mozilla/5.0")
 
             val code = connection.responseCode
 
-            if (code !in 200..299) {
-                throw Exception("API қатесі: HTTP $code")
+            val stream = if (code in 200..299) {
+                connection.inputStream
+            } else {
+                connection.errorStream
             }
 
-            val response = connection.inputStream
-                .bufferedReader()
-                .use { it.readText() }
+            val response = stream?.bufferedReader()?.use { it.readText() } ?: ""
+
+            if (code !in 200..299) {
+                throw Exception("API қатесі HTTP $code: $response")
+            }
 
             return parsePrayerTimes(response)
 
@@ -48,22 +54,38 @@ object PrayerApi {
 
         val root = JSONObject(json)
 
-        val array = root.optJSONArray("result")
-            ?: throw Exception("API result табылмады")
+        // API жауабында "result" немесе "data" массиві болуы мүмкін
+        val array = root.optJSONArray("result") 
+            ?: root.optJSONArray("data")
+            ?: throw Exception("API құрылымында 'result' немесе 'data' массиві табылмады")
 
         for (i in 0 until array.length()) {
 
             val item = array.getJSONObject(i)
 
+            // API-дегі кілттердің бас немесе кіші әріппен келуін ескеру
+            val date = when {
+                item.has("date") -> item.optString("date")
+                item.has("Date") -> item.optString("Date")
+                else -> ""
+            }
+
+            val fajr = item.optString("fajr", item.optString("Fajr", "--:--"))
+            val sunrise = item.optString("sunrise", item.optString("Sunrise", "--:--"))
+            val dhuhr = item.optString("dhuhr", item.optString("Dhuhr", "--:--"))
+            val asr = item.optString("asr", item.optString("Asr", "--:--"))
+            val maghrib = item.optString("maghrib", item.optString("Maghrib", "--:--"))
+            val isha = item.optString("isha", item.optString("Isha", "--:--"))
+
             result.add(
                 DailyPrayerTimes(
-                    date = item.optString("Date"),
-                    fajr = item.optString("fajr"),
-                    sunrise = item.optString("sunrise"),
-                    dhuhr = item.optString("dhuhr"),
-                    asr = item.optString("asr"),
-                    maghrib = item.optString("maghrib"),
-                    isha = item.optString("isha")
+                    date = date,
+                    fajr = fajr,
+                    sunrise = sunrise,
+                    dhuhr = dhuhr,
+                    asr = asr,
+                    maghrib = maghrib,
+                    isha = isha
                 )
             )
         }
