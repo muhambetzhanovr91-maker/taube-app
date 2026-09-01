@@ -28,6 +28,42 @@ import androidx.compose.ui.unit.sp
 import com.google.android.gms.location.LocationServices
 import java.util.Locale
 
+// ---------------- МОДЕЛЬДЕРДІ АНЫҚТАУ ----------------
+
+data class HomePrayerItem(
+    val icon: String,
+    val name: String,
+    val time: String,
+    val isActive: Boolean
+)
+
+data class PrayerTimeData(
+    val fajr: String,
+    val sunrise: String,
+    val dhuhr: String,
+    val asr: String,
+    val maghrib: String,
+    val isha: String
+)
+
+data class SurahModel(
+    val id: Int,
+    val name: String,
+    val arabicTitle: String,
+    val arabicText: String,
+    val translation: String
+)
+
+data class DhikrDuaModel(
+    val title: String,
+    val category: String,
+    val arabicText: String,
+    val readKazakh: String,
+    val translation: String
+)
+
+// ---------------- MAIN ACTIVITY ----------------
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -85,22 +121,12 @@ fun MainAppStructure() {
 
 // ---------------- 1. НАМАЗ КЕСТЕСІ ЭКРАНЫ ----------------
 
-data class PrayerTimeData(
-    val fajr: String,
-    val sunrise: String,
-    val dhuhr: String,
-    val asr: String,
-    val maghrib: String,
-    val isha: String
-)
-
 @Composable
 fun HomeScreen(currentCity: String, onCityChange: (String) -> Unit) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     var showCityDialog by remember { mutableStateOf(false) }
 
-    // Қалалар бойынша уақыт кестесі
     val cityTimes = mapOf(
         "Атырау" to PrayerTimeData("03:50", "05:28", "13:05", "17:17", "20:30", "22:05"),
         "Алматы" to PrayerTimeData("04:10", "05:45", "13:00", "16:50", "20:10", "21:40"),
@@ -247,6 +273,10 @@ fun HomeScreen(currentCity: String, onCityChange: (String) -> Unit) {
             HomePrayerItem("☀️", "Күн шығуы", activeTimes.sunrise, false),
             HomePrayerItem("🕌", "Бесін", activeTimes.dhuhr, true),
             HomePrayerItem("🌆", "Екінті", activeTimes.asr, false),
+            HomePrayerItem(""🌅", "Таң (Субх)", activeTimes.fajr, false),
+            HomePrayerItem("☀️", "Күн шығуы", activeTimes.sunrise, false),
+            HomePrayerItem("🕌", "Бесін", activeTimes.dhuhr, true),
+            HomePrayerItem("🌆", "Екінті", activeTimes.asr, false),
             HomePrayerItem("🌇", "Ақшам", activeTimes.maghrib, false),
             HomePrayerItem("🌙", "Құптан (Иша)", activeTimes.isha, false)
         )
@@ -262,14 +292,6 @@ fun HomeScreen(currentCity: String, onCityChange: (String) -> Unit) {
 }
 
 // ---------------- 2. ҚҰРАН ЭКРАНЫ ----------------
-
-data class SurahModel(
-    val id: Int,
-    val name: String,
-    val arabicTitle: String,
-    val arabicText: String,
-    val translation: String
-)
 
 @Composable
 fun QuranScreen() {
@@ -360,7 +382,6 @@ fun QuranScreen() {
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // Арабша мәтін
                         Text(
                             text = surah.arabicText,
                             fontSize = 20.sp,
@@ -371,7 +392,6 @@ fun QuranScreen() {
                             modifier = Modifier.fillMaxWidth()
                         )
 
-                        // Қазақша аударма (Ауыстырғыш қосулы болса ғана көрінеді)
                         if (showTranslation) {
                             Spacer(modifier = Modifier.height(10.dp))
                             Divider(color = Color(0xFFF1F5F9))
@@ -391,14 +411,6 @@ fun QuranScreen() {
 }
 
 // ---------------- 3. ДҰҒА МЕН ЗІКІР ЭКРАНЫ ----------------
-
-data class DhikrDuaModel(
-    val title: String,
-    val category: String,
-    val arabicText: String,
-    val readKazakh: String,
-    val translation: String
-)
 
 @Composable
 fun DhikrDuaScreen() {
@@ -480,7 +492,7 @@ fun DhikrDuaScreen() {
     }
 }
 
-// ---------------- КӨМЕКШІ ФУНКЦИЯЛАР ----------------
+// ---------------- КӨМЕКШІ ФУНКЦИЯЛАР ЖӘНЕ КОМПОНЕНТТЕР ----------------
 
 private fun getUserLocation(context: Context, onLocationReceived: (Location?) -> Unit) {
     try {
