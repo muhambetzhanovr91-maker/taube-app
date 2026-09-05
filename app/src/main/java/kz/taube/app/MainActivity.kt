@@ -18,8 +18,18 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Brightness5
+import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.NightsStay
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.filled.WbTwilight
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -55,7 +65,8 @@ object TaubeColors {
 // =========================================================
 
 data class HomePrayerItem(
-    val icon: String,
+    val icon: ImageVector,
+    val iconColor: Color,
     val name: String,
     val time: String,
     val isActive: Boolean
@@ -109,14 +120,14 @@ class MainActivity : ComponentActivity() {
 // НЕГІЗГІ ҚҰРЫЛЫМ — 5 ТАБТЫ BOTTOM NAVIGATION
 // =========================================================
 
-private data class TabItem(val icon: String, val label: String)
+private data class TabItem(val icon: ImageVector, val label: String)
 
 private val tabs = listOf(
-    TabItem("🏠", "Басты бет"),
-    TabItem("🧭", "Құбыла"),
-    TabItem("📖", "Құран"),
-    TabItem("📿", "Зікір"),
-    TabItem("⚙️", "Қосымша")
+    TabItem(Icons.Filled.Home, "Басты бет"),
+    TabItem(Icons.Filled.Explore, "Құбыла"),
+    TabItem(Icons.Filled.MenuBook, "Құран"),
+    TabItem(Icons.Filled.Favorite, "Зікір"),
+    TabItem(Icons.Filled.Settings, "Қосымша")
 )
 
 @Composable
@@ -132,7 +143,7 @@ fun MainAppStructure() {
                     NavigationBarItem(
                         selected = selectedTab == index,
                         onClick = { selectedTab = index },
-                        icon = { Text(tab.icon, fontSize = 20.sp) },
+                        icon = { Icon(tab.icon, contentDescription = tab.label) },
                         label = { Text(tab.label, fontSize = 10.sp) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = TaubeColors.DeepGreen,
@@ -167,7 +178,7 @@ fun HomeScreen(currentCity: String, onCityChange: (String) -> Unit) {
     var showCityDialog by remember { mutableStateOf(false) }
 
     val cityTimes = mapOf(
-        "Атырау" to PrayerTimeData("05:24", "06:51", "13:36", "18:13", "18:13", "21:41"),
+        "Атырау" to PrayerTimeData("05:24", "06:51", "13:36", "18:13", "20:14", "21:41"),
         "Алматы" to PrayerTimeData("04:10", "05:45", "13:00", "16:50", "20:10", "21:40"),
         "Астана" to PrayerTimeData("03:40", "05:20", "13:10", "17:10", "20:50", "22:30"),
         "Шымкент" to PrayerTimeData("04:20", "05:50", "13:08", "16:55", "20:15", "21:45"),
@@ -311,12 +322,12 @@ fun HomeScreen(currentCity: String, onCityChange: (String) -> Unit) {
             Spacer(modifier = Modifier.height(12.dp))
 
             val prayerList = listOf(
-                HomePrayerItem("🌅", "Таң", activeTimes.fajr, false),
-                HomePrayerItem("☀️", "Күн шығуы", activeTimes.sunrise, false),
-                HomePrayerItem("🕌", "Бесін", activeTimes.dhuhr, true),
-                HomePrayerItem("🌆", "Екінті", activeTimes.asr, false),
-                HomePrayerItem("🌇", "Ақшам", activeTimes.maghrib, false),
-                HomePrayerItem("🌙", "Құптан", activeTimes.isha, false)
+                HomePrayerItem(Icons.Filled.WbTwilight, Color(0xFFF59E0B), "Таң", activeTimes.fajr, false),
+                HomePrayerItem(Icons.Filled.WbSunny, Color(0xFFFACC15), "Күн шығуы", activeTimes.sunrise, false),
+                HomePrayerItem(Icons.Filled.AccountBalance, TaubeColors.DeepGreen, "Бесін", activeTimes.dhuhr, true),
+                HomePrayerItem(Icons.Filled.Brightness5, Color(0xFF0EA5A0), "Екінті", activeTimes.asr, false),
+                HomePrayerItem(Icons.Filled.WbTwilight, Color(0xFFEA580C), "Ақшам", activeTimes.maghrib, false),
+                HomePrayerItem(Icons.Filled.NightsStay, Color(0xFF4C1D95), "Құптан", activeTimes.isha, false)
             )
 
             Card(
@@ -782,7 +793,20 @@ private fun PrayerRowCard(data: HomePrayerItem) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(text = data.icon, fontSize = 18.sp)
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(data.iconColor.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = data.icon,
+                    contentDescription = data.name,
+                    tint = data.iconColor,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
             Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = data.name,
