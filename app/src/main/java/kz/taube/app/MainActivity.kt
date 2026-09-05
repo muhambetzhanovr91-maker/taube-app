@@ -11,14 +11,21 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -28,7 +35,24 @@ import androidx.compose.ui.unit.sp
 import com.google.android.gms.location.LocationServices
 import java.util.Locale
 
-// ---------------- МОДЕЛЬДЕРДІ АНЫҚТАУ ----------------
+// =========================================================
+// ТҮС ПАЛИТРАСЫ (мокаптағыдай: терең жасыл + алтын + крем)
+// =========================================================
+
+object TaubeColors {
+    val DarkGreen = Color(0xFF0B3D2E)
+    val DeepGreen = Color(0xFF0D5C3A)
+    val Gold = Color(0xFFCBA135)
+    val Cream = Color(0xFFF8F6F1)
+    val CardWhite = Color(0xFFFFFFFF)
+    val TextDark = Color(0xFF0F172A)
+    val TextGray = Color(0xFF64748B)
+    val ActiveBg = Color(0xFFE6F4ED)
+}
+
+// =========================================================
+// МОДЕЛЬДЕР
+// =========================================================
 
 data class HomePrayerItem(
     val icon: String,
@@ -51,18 +75,24 @@ data class SurahModel(
     val name: String,
     val arabicTitle: String,
     val arabicText: String,
-    val translation: String
+    val translation: String,
+    val versesInfo: String
 )
 
-data class DhikrDuaModel(
+data class DhikrItem(
     val title: String,
-    val category: String,
-    val arabicText: String,
-    val readKazakh: String,
-    val translation: String
+    val subtitle: String,
+    val target: Int
 )
 
-// ---------------- MAIN ACTIVITY ----------------
+data class MoreMenuItem(
+    val icon: String,
+    val title: String
+)
+
+// =========================================================
+// MAIN ACTIVITY
+// =========================================================
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -75,7 +105,19 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// ---------------- НЕГІЗГІ ҚҰРЫЛЫМ (BOTTOM NAVIGATION) ----------------
+// =========================================================
+// НЕГІЗГІ ҚҰРЫЛЫМ — 5 ТАБТЫ BOTTOM NAVIGATION
+// =========================================================
+
+private data class TabItem(val icon: String, val label: String)
+
+private val tabs = listOf(
+    TabItem("🏠", "Басты бет"),
+    TabItem("🧭", "Құбыла"),
+    TabItem("📖", "Құран"),
+    TabItem("📿", "Зікір"),
+    TabItem("⚙️", "Қосымша")
+)
 
 @Composable
 fun MainAppStructure() {
@@ -83,43 +125,40 @@ fun MainAppStructure() {
     var currentCity by remember { mutableStateOf("Атырау") }
 
     Scaffold(
+        containerColor = TaubeColors.Cream,
         bottomBar = {
-            NavigationBar(
-                containerColor = Color.White,
-                tonalElevation = 8.dp
-            ) {
-                NavigationBarItem(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    icon = { Text("🕌", fontSize = 20.sp) },
-                    label = { Text("Намаз", fontSize = 11.sp) }
-                )
-                NavigationBarItem(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    icon = { Text("📖", fontSize = 20.sp) },
-                    label = { Text("Құран", fontSize = 11.sp) }
-                )
-                NavigationBarItem(
-                    selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 },
-                    icon = { Text("📿", fontSize = 20.sp) },
-                    label = { Text("Дұға мен Зікір", fontSize = 11.sp) }
-                )
+            NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
+                tabs.forEachIndexed { index, tab ->
+                    NavigationBarItem(
+                        selected = selectedTab == index,
+                        onClick = { selectedTab = index },
+                        icon = { Text(tab.icon, fontSize = 20.sp) },
+                        label = { Text(tab.label, fontSize = 10.sp) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = TaubeColors.DeepGreen,
+                            selectedTextColor = TaubeColors.DeepGreen,
+                            indicatorColor = TaubeColors.ActiveBg
+                        )
+                    )
+                }
             }
         }
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             when (selectedTab) {
                 0 -> HomeScreen(currentCity = currentCity, onCityChange = { newCity -> currentCity = newCity })
-                1 -> QuranScreen()
-                2 -> DhikrDuaScreen()
+                1 -> QiblaScreen()
+                2 -> QuranScreen()
+                3 -> ZikrScreen()
+                4 -> MoreScreen()
             }
         }
     }
 }
 
-// ---------------- 1. НАМАЗ КЕСТЕСІ ЭКРАНЫ ----------------
+// =========================================================
+// 1. БАСТЫ БЕТ — Ассаламу ғалейкум! + келесі намаз + кесте
+// =========================================================
 
 @Composable
 fun HomeScreen(currentCity: String, onCityChange: (String) -> Unit) {
@@ -128,22 +167,19 @@ fun HomeScreen(currentCity: String, onCityChange: (String) -> Unit) {
     var showCityDialog by remember { mutableStateOf(false) }
 
     val cityTimes = mapOf(
-        "Атырау" to PrayerTimeData("03:50", "05:28", "13:05", "17:17", "20:30", "22:05"),
+        "Атырау" to PrayerTimeData("05:24", "06:51", "13:36", "18:13", "18:13", "21:41"),
         "Алматы" to PrayerTimeData("04:10", "05:45", "13:00", "16:50", "20:10", "21:40"),
         "Астана" to PrayerTimeData("03:40", "05:20", "13:10", "17:10", "20:50", "22:30"),
         "Шымкент" to PrayerTimeData("04:20", "05:50", "13:08", "16:55", "20:15", "21:45"),
         "Ақтөбе" to PrayerTimeData("03:55", "05:35", "13:15", "17:20", "20:45", "22:20")
     )
-
     val activeTimes = cityTimes[currentCity] ?: cityTimes["Атырау"]!!
 
     LaunchedEffect(Unit) {
         getUserLocation(context) { loc ->
             if (loc != null) {
                 val detected = getCityNameFromCoords(context, loc.latitude, loc.longitude)
-                if (cityTimes.containsKey(detected)) {
-                    onCityChange(detected)
-                }
+                if (cityTimes.containsKey(detected)) onCityChange(detected)
             }
         }
     }
@@ -176,311 +212,474 @@ fun HomeScreen(currentCity: String, onCityChange: (String) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF8FAFC))
-            .padding(horizontal = 20.dp)
+            .background(TaubeColors.Cream)
             .verticalScroll(scrollState)
     ) {
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(
-                modifier = Modifier.clickable { showCityDialog = true }
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = currentCity,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF0F172A)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(text = "📍 (ауыстыру)", fontSize = 12.sp, color = Color(0xFF0D5C3A))
-                }
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "Бүгін • Намаз кестесі",
-                    fontSize = 12.sp,
-                    color = Color(0xFF64748B)
-                )
-            }
-
-            IconButton(onClick = {
-                Toast.makeText(context, "Хабарландырулар белсенді", Toast.LENGTH_SHORT).show()
-            }) {
-                Text(text = "🔔", fontSize = 20.sp)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Card(
+        // ---------- Жасыл геройлық блок (грит + бармен) ----------
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(190.dp),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF0D5C3A))
+                .background(
+                    Brush.verticalGradient(
+                        listOf(TaubeColors.DarkGreen, TaubeColors.DeepGreen)
+                    )
+                )
+                .padding(horizontal = 20.dp, vertical = 20.dp)
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(modifier = Modifier.clickable { showCityDialog = true }) {
+                    Text(
+                        text = "Ассаламу ғалейкум!",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(text = "19 Мамыр, жексенбі", fontSize = 13.sp, color = Color(0xFFCBD5C0))
+                    Text(text = "10 Зулқада 1445", fontSize = 13.sp, color = Color(0xFFCBD5C0))
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(text = "📍 $currentCity  (ауыстыру)", fontSize = 12.sp, color = TaubeColors.Gold)
+                }
+                IconButton(onClick = {
+                    Toast.makeText(context, "Хабарландырулар белсенді", Toast.LENGTH_SHORT).show()
+                }) {
+                    Text(text = "🔔", fontSize = 20.sp, color = Color.White)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // ---------- Келесі намаз картасы (шам-фонарь стилінде) ----------
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF124A34))
+            ) {
                 Column(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                        .fillMaxWidth()
+                        .padding(20.dp)
                 ) {
                     Text(
                         text = "КЕЛЕСІ НАМАЗ",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFFA7F3D0),
+                        color = TaubeColors.Gold,
                         letterSpacing = 1.sp
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Бесін",
+                        text = "Екінті",
                         fontSize = 26.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = activeTimes.dhuhr,
-                        fontSize = 32.sp,
+                        text = activeTimes.asr,
+                        fontSize = 36.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = Color.White
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "⏳ 04:01:01 қалды",
+                        fontSize = 13.sp,
+                        color = Color(0xFFCBD5C0)
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = "🔔  ", fontSize = 13.sp)
+                        Text(text = "Аазан еске салғышы", fontSize = 13.sp, color = Color(0xFFCBD5C0))
+                    }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        // ---------- Бүгінгі намаз уақыттары ----------
+        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp)) {
+            Text(
+                text = "БҮГІНГІ НАМАЗ УАҚЫТТАРЫ",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = TaubeColors.TextGray,
+                letterSpacing = 0.5.sp
+            )
+            Spacer(modifier = Modifier.height(12.dp))
 
-        Text(
-            text = "Бүгінгі намаз уақыттары",
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF0F172A)
-        )
+            val prayerList = listOf(
+                HomePrayerItem("🌅", "Таң", activeTimes.fajr, false),
+                HomePrayerItem("☀️", "Күн шығуы", activeTimes.sunrise, false),
+                HomePrayerItem("🕌", "Бесін", activeTimes.dhuhr, true),
+                HomePrayerItem("🌆", "Екінті", activeTimes.asr, false),
+                HomePrayerItem("🌇", "Ақшам", activeTimes.maghrib, false),
+                HomePrayerItem("🌙", "Құптан", activeTimes.isha, false)
+            )
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        val prayerList = listOf(
-            HomePrayerItem("🌅", "Таң (Субх)", activeTimes.fajr, false),
-            HomePrayerItem("☀️", "Күн шығуы", activeTimes.sunrise, false),
-            HomePrayerItem("🕌", "Бесін", activeTimes.dhuhr, true),
-            HomePrayerItem("🌆", "Екінті", activeTimes.asr, false),
-            HomePrayerItem("🌇", "Ақшам", activeTimes.maghrib, false),
-            HomePrayerItem("🌙", "Құптан (Иша)", activeTimes.isha, false)
-        )
-
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            prayerList.forEach { item ->
-                PrayerRowCard(data = item)
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Column {
+                    prayerList.forEachIndexed { index, item ->
+                        PrayerRowCard(data = item)
+                        if (index != prayerList.lastIndex) {
+                            Divider(color = Color(0xFFF1F5F9))
+                        }
+                    }
+                }
             }
-        }
 
-        Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = TaubeColors.ActiveBg)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "«Еске алуармен жүректер тыныштық табады»",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = TaubeColors.TextDark
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(text = "Құран 13:28", fontSize = 11.sp, color = TaubeColors.TextGray)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+        }
     }
 }
 
-// ---------------- 2. ҚҰРАН ЭКРАНЫ ----------------
+// =========================================================
+// 2. ҚҰБЫЛА БАҒЫТЫ ЭКРАНЫ
+// =========================================================
 
 @Composable
-fun QuranScreen() {
-    var showTranslation by remember { mutableStateOf(true) }
-
-    val surahList = listOf(
-        SurahModel(
-            1, "Фатиха сүресі", "الفاتحة",
-            "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ\nالْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ\nالرَّحْمَٰنِ الرَّحِيمِ\nمَالِكِ يَوْمِ الدِّينِ",
-            "Аса қамқор, ерекше мейірімді Алланың атымен бастаймын. Барлық мақтау-мадақ әлемдердің Раббысы Аллаға тән. Ол — Аса қамқор, ерекше мейірімді. Қиямет күнінің Иесі."
-        ),
-        SurahModel(
-            112, "Ықылас сүресі", "الإخلاص",
-            "قُلْ هُوَ اللَّهُ أَحَدٌ\nاللَّهُ الصَّمَدُ\nلَمْ يَلِدْ وَلَمْ يُولَدْ\nوَلَمْ يَكُن لَّهُ كُفُوًا أَحَدٌ",
-            "Айт: Ол Алла — Біреу. Алла — Самәд (ешкімге мұқтаж емес). Ол тумады да, туылмады. Әрі Оған ешкім тең келе алмайды."
-        ),
-        SurahModel(
-            113, "Фалақ сүресі", "الفلق",
-            "قُلْ أَعُوذُ بِرَبِّ الْفَلَقِ\nمِن شَرِّ مَا خَلَقَ",
-            "Айт: Таңның Раббысына сиынамын, Оның жаратқан нәрселерінің жамандығынан..."
-        ),
-        SurahModel(
-            114, "Нас сүресі", "الناس",
-            "قُلْ أَعُوذُ بِرَبِّ النَّاسِ\nمَلِكِ النَّاسِ\nإِلَٰهِ النَّاسِ",
-            "Айт: Адамдардың Раббысына, Адамдардың Патшасына, Адамдардың Тәңіріне сиынамын..."
-        )
-    )
-
+fun QiblaScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF8FAFC))
-            .padding(horizontal = 20.dp)
+            .background(
+                Brush.verticalGradient(listOf(TaubeColors.DarkGreen, TaubeColors.DeepGreen))
+            )
     ) {
-        Spacer(modifier = Modifier.height(16.dp))
-
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
-                Text(text = "Құран Кәрім", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
-                Text(text = "Сүрелер тізімі", fontSize = 13.sp, color = Color(0xFF64748B))
-            }
+            Icon(Icons.Filled.ArrowBack, contentDescription = null, tint = Color.White)
+            Text(text = "Құбыла бағыты", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Icon(Icons.Filled.Settings, contentDescription = null, tint = Color.White)
+        }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = "Аударма", fontSize = 12.sp, color = Color(0xFF64748B))
-                Spacer(modifier = Modifier.width(4.dp))
-                Switch(
-                    checked = showTranslation,
-                    onCheckedChange = { showTranslation = it }
-                )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(text = "Құбыла бағыты", fontSize = 14.sp, color = Color(0xFFCBD5C0))
+            Text(
+                text = "248°",
+                fontSize = 48.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color.White
+            )
+            Text(text = "Меккеге дейін 4321 км", fontSize = 13.sp, color = Color(0xFFCBD5C0))
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // ---------- Компас шеңбері ----------
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(32.dp)
+                .aspectRatio(1f)
+                .clip(CircleShape)
+                .background(Color(0xFF0E4632)),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize(0.86f)
+                    .clip(CircleShape)
+                    .background(Color.Transparent)
+            ) {
+                Text("N", color = Color.White, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp))
+                Text("S", color = Color.White, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp))
+                Text("W", color = Color.White, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.align(Alignment.CenterStart).padding(start = 8.dp))
+                Text("E", color = Color.White, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 8.dp))
+            }
+            // Кааба белгісі
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF111827)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("🕋", fontSize = 30.sp)
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Card(
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF124A34))
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Дәлдік", fontSize = 12.sp, color = Color(0xFFCBD5C0))
+                    Text("±3°", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+            }
+            Card(
+                modifier = Modifier.weight(1f).clickable { },
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF124A34))
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Filled.Settings, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Калибрлеу", fontSize = 13.sp, color = Color.White)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+    }
+}
+
+// =========================================================
+// 3. ҚҰРАН ЭКРАНЫ
+// =========================================================
+
+@Composable
+fun QuranScreen() {
+    var selectedFilter by remember { mutableIntStateOf(0) }
+    val filters = listOf("Сүрелер", "Парақтар", "Сақталған")
+
+    val surahList = listOf(
+        SurahModel(1, "Әл-Фатиха сүресі", "الفاتحة",
+            "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
+            "Аса қамқор, ерекше мейірімді Алланың атымен бастаймын.", "Мекеде түсті • 7 аят"),
+        SurahModel(2, "Әл-Бақара сүресі", "البقرة",
+            "الم ذَٰلِكَ الْكِتَابُ لَا رَيْبَ فِيهِ",
+            "Алиф, Лям, Мим. Бұл — Кітап, онда күмән жоқ.", "Мединеде түсті • 286 аят"),
+        SurahModel(3, "Әли Имран сүресі", "آل عمران",
+            "الم اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ",
+            "Алиф, Лям, Мим. Алла — Одан басқа тәңір жоқ.", "Мединеде түсті • 200 аят"),
+        SurahModel(4, "Ән-Ниса сүресі", "النساء",
+            "يَا أَيُّهَا النَّاسُ اتَّقُوا رَبَّكُمُ",
+            "Ей адамдар! Раббыларыңнан қорқыңдар.", "Мединеде түсті • 176 аят")
+    )
+
+    Column(modifier = Modifier.fillMaxSize().background(TaubeColors.Cream)) {
+        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+            Text(text = "Құран", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TaubeColors.TextDark)
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                filters.forEachIndexed { index, filter ->
+                    val active = selectedFilter == index
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(if (active) TaubeColors.DeepGreen else Color(0xFFEFEFEF))
+                            .clickable { selectedFilter = index }
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = filter,
+                            fontSize = 13.sp,
+                            color = if (active) Color.White else TaubeColors.TextGray
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = TaubeColors.ActiveBg)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Соңғы оқылған", fontSize = 11.sp, color = TaubeColors.TextGray)
+                    Text("Әл-Бақара сүресі", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TaubeColors.TextDark)
+                    Text("Аят 255", fontSize = 12.sp, color = TaubeColors.TextGray)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = { },
+                        colors = ButtonDefaults.buttonColors(containerColor = TaubeColors.DeepGreen),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("Жалғастыру")
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("Сүрелер тізімі", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TaubeColors.TextDark)
+        }
 
         LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
             contentPadding = PaddingValues(bottom = 20.dp)
         ) {
             items(surahList) { surah ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { }
+                        .padding(vertical = 12.dp, horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "${surah.id}. ${surah.name}",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF0D5C3A)
-                            )
-                            Text(
-                                text = surah.arabicTitle,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF0D5C3A)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
+                    Column {
                         Text(
-                            text = surah.arabicText,
-                            fontSize = 20.sp,
+                            text = "${surah.id}. ${surah.name}",
+                            fontSize = 14.sp,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xFF0F172A),
-                            lineHeight = 32.sp,
-                            textAlign = TextAlign.Right,
-                            modifier = Modifier.fillMaxWidth()
+                            color = TaubeColors.TextDark
                         )
-
-                        if (showTranslation) {
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Divider(color = Color(0xFFF1F5F9))
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text(
-                                text = surah.translation,
-                                fontSize = 13.sp,
-                                color = Color(0xFF475569),
-                                lineHeight = 18.sp
-                            )
-                        }
+                        Text(text = surah.versesInfo, fontSize = 11.sp, color = TaubeColors.TextGray)
                     }
+                    Text(text = surah.arabicTitle, fontSize = 16.sp, color = TaubeColors.DeepGreen)
                 }
+                Divider(color = Color(0xFFF1F5F9))
             }
         }
     }
 }
 
-// ---------------- 3. ДҰҒА МЕН ЗІКІР ЭКРАНЫ ----------------
+// =========================================================
+// 4. ЗІКІР ЭКРАНЫ
+// =========================================================
 
 @Composable
-fun DhikrDuaScreen() {
-    val itemsList = listOf(
-        DhikrDuaModel(
-            title = "Аятүл-Күрси",
-            category = "Қасиетті Аят",
-            arabicText = "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ",
-            readKazakh = "Аллаһу лә иләһә иллә һуәл-Хаййул-Қаййум...",
-            translation = "Алла — Одан басқа ешбір құдай жоқ. Ол Тірі, Әрі Әрқашан Бар Болушы..."
-        ),
-        DhikrDuaModel(
-            title = "Таңғы зікір",
-            category = "Күнделікті зікір",
-            arabicText = "سُبْحَانَ اللَّهِ وَبِحَمْدِهِ",
-            readKazakh = "Субханаллаһи уә бихамдиһи",
-            translation = "Алла Пәк әрі барлық мақтау Оған тән (Күніне 100 рет)"
-        ),
-        DhikrDuaModel(
-            title = "Іс бастардағы дұға",
-            category = "Күнделікті дұға",
-            arabicText = "رَبِّ يَسِّرْ وَلَا تُعَسِّرْ رَبِّ تَمِّمْ بِالْخَيْرِ",
-            readKazakh = "Рабби йассир уә лә туғассир, Рабби тәммим бил-хайр",
-            translation = "Раббым! Жеңілдет, ауырлатпа. Раббым, ісімді қайырлы аяқтауды нәсіп ет."
-        )
+fun ZikrScreen() {
+    var selectedCategory by remember { mutableIntStateOf(0) }
+    val categories = listOf("Таңғы", "Кешкі", "Тасбих", "Дұғалар", "99 есім")
+
+    val dhikrItems = listOf(
+        DhikrItem("Аят әл-Күрси", "Бақара сүресі, 255-аят", 1),
+        DhikrItem("3 Құл (Ихлас, Фалақ, Нас)", "3 рет оқылады", 3),
+        DhikrItem("Тәубе истиғфары", "100 рет", 100),
+        DhikrItem("СубханАллаһ", "33 рет", 33)
     )
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFF8FAFC))
-            .padding(horizontal = 20.dp)
-    ) {
+    var counter by remember { mutableIntStateOf(0) }
+
+    Column(modifier = Modifier.fillMaxSize().background(TaubeColors.Cream)) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = TaubeColors.DarkGreen)
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text("Таңғы зікір", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("Күн сайын оқылатын таңғы дұғалар", fontSize = 12.sp, color = Color(0xFFCBD5C0))
+            }
+        }
+
+        LazyRow(
+            modifier = Modifier.padding(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(categories) { cat ->
+                val index = categories.indexOf(cat)
+                val active = selectedCategory == index
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(if (active) TaubeColors.DeepGreen else Color(0xFFEFEFEF))
+                        .clickable { selectedCategory = index }
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                ) {
+                    Text(cat, fontSize = 12.sp, color = if (active) Color.White else TaubeColors.TextGray)
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(16.dp))
 
-        Text(text = "Дұғалар мен Зікірлер", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
-        Text(text = "Күнделікті оқылатын дұға-зікірлер", fontSize = 13.sp, color = Color(0xFF64748B))
+        Text(
+            text = "Таңғы зікірлер",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = TaubeColors.TextDark,
+            modifier = Modifier.padding(horizontal = 20.dp)
+        )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
             contentPadding = PaddingValues(bottom = 20.dp)
         ) {
-            items(itemsList) { item ->
+            items(dhikrItems) { item ->
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { counter++ },
+                    shape = RoundedCornerShape(14.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = item.category.uppercase(),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF0D5C3A),
-                            letterSpacing = 1.sp
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(text = item.title, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = item.arabicText,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color(0xFF0F172A),
-                            textAlign = TextAlign.Right,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(text = item.readKazakh, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Color(0xFF0D5C3A))
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(text = item.translation, fontSize = 12.sp, color = Color(0xFF64748B))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(item.title, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = TaubeColors.TextDark)
+                            Text(item.subtitle, fontSize = 11.sp, color = TaubeColors.TextGray)
+                        }
+                        Box(
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(TaubeColors.ActiveBg)
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text("${item.target}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TaubeColors.DeepGreen)
+                        }
                     }
                 }
             }
@@ -488,7 +687,61 @@ fun DhikrDuaScreen() {
     }
 }
 
-// ---------------- КӨМЕКШІ ФУНКЦИЯЛАР ЖӘНЕ КОМПОНЕНТТЕР ----------------
+// =========================================================
+// 5. ҚОСЫМША (МЕНЮ) ЭКРАНЫ
+// =========================================================
+
+@Composable
+fun MoreScreen() {
+    val menuItems = listOf(
+        MoreMenuItem("📅", "Ислам күнтізбесі"),
+        MoreMenuItem("🕐", "Ораза уақыты"),
+        MoreMenuItem("📖", "Құран оқу жоспары"),
+        MoreMenuItem("🎓", "Намазды үйрену"),
+        MoreMenuItem("📔", "Хадис күнделігі"),
+        MoreMenuItem("🤲", "Дуа кітапшасы"),
+        MoreMenuItem("🔖", "Бетбелгілер"),
+        MoreMenuItem("⚙️", "Параметрлер")
+    )
+
+    Column(modifier = Modifier.fillMaxSize().background(TaubeColors.Cream)) {
+        Text(
+            text = "Қосымша",
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            color = TaubeColors.TextDark,
+            modifier = Modifier.padding(20.dp)
+        )
+
+        LazyColumn(
+            modifier = Modifier.padding(horizontal = 20.dp),
+            contentPadding = PaddingValues(bottom = 20.dp)
+        ) {
+            items(menuItems) { item ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { }
+                        .padding(vertical = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(item.icon, fontSize = 18.sp)
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Text(item.title, fontSize = 15.sp, color = TaubeColors.TextDark)
+                    }
+                    Text("›", fontSize = 18.sp, color = TaubeColors.TextGray)
+                }
+                Divider(color = Color(0xFFF1F5F9))
+            }
+        }
+    }
+}
+
+// =========================================================
+// КӨМЕКШІ ФУНКЦИЯЛАР ЖӘНЕ КОМПОНЕНТТЕР
+// =========================================================
 
 private fun getUserLocation(context: Context, onLocationReceived: (Location?) -> Unit) {
     try {
@@ -520,37 +773,29 @@ private fun getCityNameFromCoords(context: Context, lat: Double, lon: Double): S
 
 @Composable
 private fun PrayerRowCard(data: HomePrayerItem) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (data.isActive) Color(0xFFE6F4ED) else Color.White
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (data.isActive) 0.dp else 1.dp)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(if (data.isActive) TaubeColors.ActiveBg else Color.Transparent)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = data.icon, fontSize = 18.sp)
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = data.name,
-                    fontSize = 15.sp,
-                    fontWeight = if (data.isActive) FontWeight.Bold else FontWeight.Medium,
-                    color = if (data.isActive) Color(0xFF0D5C3A) else Color(0xFF1E293B)
-                )
-            }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(text = data.icon, fontSize = 18.sp)
+            Spacer(modifier = Modifier.width(12.dp))
             Text(
-                text = data.time,
+                text = data.name,
                 fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (data.isActive) Color(0xFF0D5C3A) else Color(0xFF1E293B)
+                fontWeight = if (data.isActive) FontWeight.Bold else FontWeight.Medium,
+                color = if (data.isActive) TaubeColors.DeepGreen else Color(0xFF1E293B)
             )
         }
+        Text(
+            text = data.time,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (data.isActive) TaubeColors.DeepGreen else Color(0xFF1E293B)
+        )
     }
 }
